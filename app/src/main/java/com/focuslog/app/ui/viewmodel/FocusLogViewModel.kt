@@ -15,7 +15,7 @@ import com.focuslog.app.data.datastore.TimerPreferences
 import com.focuslog.app.data.local.FocusLogDatabase
 import com.focuslog.app.data.local.LogEntry
 import com.focuslog.app.data.repository.FocusLogRepository
-import com.focuslog.app.service.AlarmReceiver
+import com.focuslog.app.util.TimerAlarmManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -186,52 +186,17 @@ class FocusLogViewModel(
 
     private fun scheduleSystemAlarm(startTimeMs: Long, durationMs: Long, triggerAtMs: Long) {
         val context = getApplication<Application>()
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            putExtra(AlarmReceiver.EXTRA_START_TIME, startTimeMs)
-            putExtra(AlarmReceiver.EXTRA_DURATION_MS, durationMs)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            ALARM_REQUEST_CODE,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        TimerAlarmManager.scheduleTimerAlarm(
+            context = context,
+            startTimeMs = startTimeMs,
+            durationMs = durationMs,
+            triggerAtMs = triggerAtMs
         )
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAtMs,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAtMs,
-                    pendingIntent
-                )
-            }
-            Log.d(TAG, "Scheduled exact alarm for $triggerAtMs (duration: ${durationMs}ms)")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Exact alarm permission missing or denied", e)
-            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMs, pendingIntent)
-        }
     }
 
     private fun cancelSystemAlarm() {
         val context = getApplication<Application>()
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, AlarmReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            ALARM_REQUEST_CODE,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        alarmManager.cancel(pendingIntent)
+        TimerAlarmManager.cancelTimerAlarm(context)
     }
 
     companion object {

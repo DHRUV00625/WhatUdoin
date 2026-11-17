@@ -1,14 +1,18 @@
 package com.focuslog.app.ui.screens
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -18,26 +22,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.focuslog.app.data.local.FocusLogDatabase
-import com.focuslog.app.data.repository.FocusLogRepository
 import com.focuslog.app.service.AlarmService
 import com.focuslog.app.ui.theme.FocusLogTheme
 import com.focuslog.app.ui.viewmodel.FocusLogViewModel
-import com.focuslog.app.util.TimeUtils
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 /**
  * Single Activity hosting the Jetpack Compose NavHost with two destinations:
  * 1. HomeScreen (start destination)
- * 2. AlarmEntryScreen
+ * 2. AlarmEntryScreen (cannot be dismissed by back press or swipe until log submitted)
  */
 class MainActivity : ComponentActivity() {
 
     private val viewModel: FocusLogViewModel by viewModels {
         FocusLogViewModel.provideFactory(application)
     }
+
+    private var currentDestination: String = "home"
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
         configureLockscreenDisplay()
         checkPermissions()
+        setupBackPressInterceptor()
 
         val incomingStartTime = intent.getLongExtra(AlarmService.EXTRA_START_TIME, -1L)
         val incomingDuration = intent.getLongExtra(AlarmService.EXTRA_DURATION_MS, -1L)
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
         } else {
             "home"
         }
+        currentDestination = startDestination
 
         setContent {
             FocusLogTheme(darkTheme = true) {
@@ -67,9 +69,11 @@ class MainActivity : ComponentActivity() {
                     startDestination = startDestination
                 ) {
                     composable("home") {
+                        currentDestination = "home"
                         HomeScreen(
                             viewModel = viewModel,
                             onNavigateToAlarmEntry = { startTime, duration ->
+                                currentDestination = "alarm_entry"
                                 navController.navigate("alarm_entry/$startTime/$duration")
                             }
                         )
@@ -82,6 +86,7 @@ class MainActivity : ComponentActivity() {
                             navArgument("durationMs") { type = NavType.LongType }
                         )
                     ) { backStackEntry ->
+                        currentDestination = "alarm_entry"
                         val startTimeMs = backStackEntry.arguments?.getLong("startTimeMs")
                             ?: System.currentTimeMillis()
                         val durationMs = backStackEntry.arguments?.getLong("durationMs") ?: 0L
@@ -95,6 +100,7 @@ class MainActivity : ComponentActivity() {
                                     startTimeMs = startTimeMs,
                                     durationMs = durationMs
                                 )
+                                currentDestination = "home"
                                 navController.navigate("home") {
                                     popUpTo("home") { inclusive = true }
                                 }
@@ -112,7 +118,7 @@ class MainActivity : ComponentActivity() {
         val incomingStartTime = intent.getLongExtra(AlarmService.EXTRA_START_TIME, -1L)
         val incomingDuration = intent.getLongExtra(AlarmService.EXTRA_DURATION_MS, -1L)
         if (incomingStartTime > 0 && incomingDuration > 0) {
-            // Activity re-launched from alarm notification
+            // Re-deliver intent to bring AlarmEntryScreen into focus
             recreate()
         }
     }
@@ -135,6 +141,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
+        // Notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -144,6 +151,32 @@ class MainActivity : ComponentActivity() {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+
+        // Exact Alarm permission (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            if (!alarmManager.canScheduleExactAlarms()) {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+        }
+    }
+
+    private fun setupBackPressInterceptor() {
+        // Enforce rule: AlarmEntryScreen CANNOT be dismissed by back button
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (currentDestination.startsWith("alarm_entry")) {
+                    // Intentionally blocked: user must type their log and submit
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
     }
 
     private fun handleTaskSubmission(

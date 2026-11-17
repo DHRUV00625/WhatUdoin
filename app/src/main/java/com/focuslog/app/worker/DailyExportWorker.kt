@@ -68,11 +68,15 @@ class DailyExportWorker(
                 )
                 .build()
 
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
-                workRequest
-            )
+            try {
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    UNIQUE_WORK_NAME,
+                    ExistingWorkPolicy.REPLACE,
+                    workRequest
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "WorkManager could not enqueue daily export", e)
+            }
         }
     }
 }
