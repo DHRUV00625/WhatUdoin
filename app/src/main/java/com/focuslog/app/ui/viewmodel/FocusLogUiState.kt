@@ -14,3 +14,4 @@ data class FocusLogUiState(
     val secondsInput: String = "0",
     val currentSessionStartTimeMs: Long = 0L
 )
+

@@ -24,3 +24,4 @@ val CardTopAccent = Color(0xFF38BDF8)
 val CardOlderMuted = Color(0xFF181E25)
 val AlertRed = Color(0xFFFF5252)
 val AlertRedContainer = Color(0xFF5C0000)
+

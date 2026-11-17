@@ -24,3 +24,4 @@ class BootReceiver : BroadcastReceiver() {
         private const val TAG = "BootReceiver"
     }
 }
+

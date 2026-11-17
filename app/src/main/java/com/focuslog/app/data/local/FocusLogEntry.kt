@@ -25,3 +25,4 @@ data class FocusLogEntry(
     val dateString: String,
     val isExported: Boolean = false
 )
+

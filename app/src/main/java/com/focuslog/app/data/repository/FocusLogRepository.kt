@@ -56,3 +56,4 @@ class FocusLogRepository(
         exported.size
     }
 }
+

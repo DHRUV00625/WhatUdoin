@@ -44,3 +44,4 @@ interface FocusLogDao {
     @Query("DELETE FROM focus_log_entries")
     suspend fun clearAll()
 }
+
