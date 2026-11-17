@@ -21,7 +21,7 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.focuslog.app.R
-import com.focuslog.app.ui.screens.AlarmActivity
+import com.focuslog.app.ui.screens.MainActivity
 
 /**
  * Foreground Service that plays a loud, continuous looping alarm sound and vibrates
@@ -65,7 +65,7 @@ class AlarmService : Service() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.PARTIAL_WAKE_LOCK,
                 "FocusLog:AlarmWakeLock"
             ).apply {
                 setReferenceCounted(false)
@@ -177,7 +177,7 @@ class AlarmService : Service() {
     }
 
     private fun buildForegroundNotification(startTimeMs: Long, durationMs: Long): Notification {
-        val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
+        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP

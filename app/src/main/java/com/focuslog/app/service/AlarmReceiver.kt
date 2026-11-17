@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.focuslog.app.ui.screens.AlarmActivity
+import com.focuslog.app.ui.screens.MainActivity
 
 /**
  * BroadcastReceiver triggered by AlarmManager when the focus countdown reaches zero.
@@ -16,13 +16,13 @@ class AlarmReceiver : BroadcastReceiver() {
         val startTimeMs = intent.getLongExtra(EXTRA_START_TIME, System.currentTimeMillis())
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, 0L)
 
-        Log.d(TAG, "Timer ended! Starting AlarmService & launching AlarmActivity.")
+        Log.d(TAG, "Timer ended! Starting AlarmService & launching MainActivity at AlarmEntry destination.")
 
         // 1. Start foreground alarm service for continuous loud audio
         AlarmService.start(context, startTimeMs, durationMs)
 
-        // 2. Launch AlarmActivity to display on screen (or over lock screen)
-        val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
+        // 2. Launch MainActivity to display on screen (or over lock screen)
+        val alarmIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP

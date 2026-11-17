@@ -20,10 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -103,7 +103,7 @@ fun CardStackView(
             if (entries.isNotEmpty()) {
                 IconButton(onClick = { isExpandedView = !isExpandedView }) {
                     Icon(
-                        imageVector = if (isExpandedView) Icons.Default.Layers else Icons.Default.List,
+                        imageVector = if (isExpandedView) Icons.Default.Layers else Icons.AutoMirrored.Filled.List,
                         contentDescription = if (isExpandedView) "Stack View" else "List View",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

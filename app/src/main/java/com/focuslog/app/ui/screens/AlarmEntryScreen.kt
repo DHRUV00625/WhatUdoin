@@ -1,14 +1,6 @@
 package com.focuslog.app.ui.screens
 
-import android.app.KeyguardManager
-import android.content.Context
-import android.content.Intent
-import android.os.Build
-import android.os.Bundle
-import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -48,134 +40,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.focuslog.app.R
-import com.focuslog.app.data.local.FocusLogDatabase
-import com.focuslog.app.data.repository.FocusLogRepository
 import com.focuslog.app.service.AlarmService
 import com.focuslog.app.ui.theme.AlertRed
-import com.focuslog.app.ui.theme.FocusLogTheme
 import com.focuslog.app.ui.theme.FocusPrimary
 import com.focuslog.app.util.TimeUtils
-import kotlinx.coroutines.launch
 
 /**
- * Full-screen Lockscreen Alarm Activity.
- *
- * Rules:
- * - Wakes device, shows over lock screen.
- * - Looping alarm cannot be dismissed until user enters non-empty text describing what they did.
- * - Back button and dismissal gestures are intercepted and disabled.
+ * Destination Screen where user logs their task to stop the alarm.
+ * Back navigation is intercepted: the alarm cannot be dismissed until text is submitted.
  */
-class AlarmActivity : ComponentActivity() {
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        configureLockscreenDisplay()
-        blockBackPress()
-
-        val startTimeMs = intent.getLongExtra(AlarmService.EXTRA_START_TIME, System.currentTimeMillis())
-        val durationMs = intent.getLongExtra(AlarmService.EXTRA_DURATION_MS, 0L)
-
-        setContent {
-            FocusLogTheme(darkTheme = true) {
-                AlarmDismissScreen(
-                    startTimeMs = startTimeMs,
-                    durationMs = durationMs,
-                    onSubmitAndDismiss = { activityDescription ->
-                        handleTaskSubmission(
-                            description = activityDescription,
-                            startTimeMs = startTimeMs,
-                            durationMs = durationMs
-                        )
-                    }
-                )
-            }
-        }
-    }
-
-    private fun configureLockscreenDisplay() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    }
-
-    private fun blockBackPress() {
-        // Enforce rule: alarm CANNOT be dismissed by back button!
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                // No-op: user must type their log and submit!
-            }
-        })
-    }
-
-    private fun handleTaskSubmission(
-        description: String,
-        startTimeMs: Long,
-        durationMs: Long
-    ) {
-        val now = System.currentTimeMillis()
-        val dateString = TimeUtils.getCurrentDateIst()
-
-        val db = FocusLogDatabase.getDatabase(applicationContext)
-        val repo = FocusLogRepository(applicationContext, db.focusLogDao())
-
-        // Use a detached coroutine on application context or runBlocking
-        kotlinx.coroutines.GlobalScope.launch {
-            repo.logActivity(
-                taskDescription = description.trim(),
-                startTimeMs = startTimeMs,
-                endTimeMs = now,
-                durationMs = durationMs,
-                dateString = dateString
-            )
-        }
-
-        // 1. Stop the looping alarm audio and release wake lock
-        AlarmService.stop(this)
-
-        // 2. Return to MainActivity
-        val mainIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        startActivity(mainIntent)
-
-        finish()
-    }
-}
-
 @Composable
-private fun AlarmDismissScreen(
+fun AlarmEntryScreen(
     startTimeMs: Long,
     durationMs: Long,
-    onSubmitAndDismiss: (String) -> Unit
+    onSubmitAndDismiss: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    // Intercept back button: user MUST enter their task to dismiss!
+    BackHandler(enabled = true) {
+        // Intentionally no-op to enforce mandatory logging
+    }
+
     var taskText by remember { mutableStateOf("") }
     val isSubmitEnabled = taskText.trim().isNotEmpty()
 
-    // Pulsing animation for the alarm ring indicator
     val infiniteTransition = rememberInfiniteTransition(label = "AlarmPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.92f,
@@ -188,7 +87,7 @@ private fun AlarmDismissScreen(
     )
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = Color(0xFF0F1115)
     ) {
         Column(
@@ -200,7 +99,7 @@ private fun AlarmDismissScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Pulsing Alarm Icon Indicator
+            // Pulsing Alarm Icon
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -225,7 +124,6 @@ private fun AlarmDismissScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Alarm Title
             Text(
                 text = stringResource(R.string.alarm_ringing),
                 style = MaterialTheme.typography.headlineMedium,
@@ -259,7 +157,6 @@ private fun AlarmDismissScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Prompt
             Text(
                 text = stringResource(R.string.alarm_prompt),
                 style = MaterialTheme.typography.titleMedium,
@@ -270,7 +167,7 @@ private fun AlarmDismissScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Mandatory Text Input
+            // Mandatory Text Input Field
             OutlinedTextField(
                 value = taskText,
                 onValueChange = { taskText = it },
@@ -296,7 +193,7 @@ private fun AlarmDismissScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Submit Button (Cannot be clicked until user enters what they did)
+            // Submit & Stop Alarm Button
             Button(
                 onClick = {
                     if (isSubmitEnabled) {
@@ -327,7 +224,7 @@ private fun AlarmDismissScreen(
             if (!isSubmitEnabled) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Alarm will continue ringing until you log your task.",
+                    text = "Alarm will continue ringing until you submit your log.",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
                     textAlign = TextAlign.Center

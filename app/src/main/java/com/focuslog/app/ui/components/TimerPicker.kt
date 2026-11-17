@@ -168,7 +168,7 @@ private fun ActiveCountdownDisplay(
         OutlinedButton(
             onClick = onCancel,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertRed),
-            border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(AlertRed.copy(alpha = 0.5f))),
+            border = androidx.compose.foundation.BorderStroke(1.dp, AlertRed.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(14.dp)
         ) {
             Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
