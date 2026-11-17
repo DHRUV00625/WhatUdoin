@@ -1,12 +1,6 @@
 package com.focuslog.app.ui.viewmodel
 
-import android.app.AlarmManager
 import android.app.Application
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import android.os.Build
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -36,7 +30,7 @@ class FocusLogViewModel(
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(FocusLogUiState())
-    private var timerJob: Job? = null
+    private var tickerJob: Job? = null
 
     val uiState: StateFlow<FocusLogUiState> = combine(
         _uiState,
@@ -58,21 +52,29 @@ class FocusLogViewModel(
             repository.timerState.collect { savedState ->
                 if (savedState.isRunning) {
                     val now = System.currentTimeMillis()
-                    val remainingSecs = ((savedState.endTimeMillis - now) / 1000L).coerceAtLeast(0L)
+                    val remainingSecs = ((savedState.endTimeMillis - now + 999L) / 1000L).coerceAtLeast(0L)
                     if (remainingSecs > 0) {
                         _uiState.update {
                             it.copy(
                                 isTimerRunning = true,
                                 remainingSeconds = remainingSecs,
                                 totalSeconds = savedState.durationSeconds,
+                                endTimeMillis = savedState.endTimeMillis,
                                 currentSessionStartTimeMs = savedState.endTimeMillis - (savedState.durationSeconds * 1000L)
                             )
                         }
-                        startCountdownJob(remainingSecs, savedState.durationSeconds)
+                        startCountdownTicker(savedState.endTimeMillis, savedState.durationSeconds)
                     } else {
-                        // Timer completed while app was closed
-                        _uiState.update { it.copy(isTimerRunning = false, remainingSeconds = 0) }
+                        // Timer completed while app was backgrounded/closed
+                        _uiState.update {
+                            it.copy(isTimerRunning = false, remainingSeconds = 0, endTimeMillis = 0)
+                        }
                     }
+                } else {
+                    _uiState.update {
+                        it.copy(isTimerRunning = false, remainingSeconds = 0, endTimeMillis = 0)
+                    }
+                    tickerJob?.cancel()
                 }
             }
         }
@@ -86,11 +88,20 @@ class FocusLogViewModel(
         _uiState.update { it.copy(secondsInput = seconds) }
     }
 
+    fun resetInputs() {
+        _uiState.update {
+            it.copy(
+                minutesInput = "25",
+                secondsInput = "0"
+            )
+        }
+    }
+
     /**
      * Starts the focus timer:
      * 1. Persists state to DataStore so it survives app kill and reboot.
-     * 2. Schedules an exact wake-up alarm with AlarmManager so it sounds even if closed/locked.
-     * 3. Runs an in-app coroutine ticker for smooth UI updates when the app is foregrounded.
+     * 2. Schedules an exact wake-up alarm with AlarmManager.setAlarmClock() for Doze mode.
+     * 3. Runs an in-app coroutine ticker computed from endTimeMillis for rock-solid precision.
      */
     fun startTimer() {
         val minutes = _uiState.value.minutesInput.toLongOrNull() ?: 0L
@@ -120,25 +131,37 @@ class FocusLogViewModel(
                 isTimerRunning = true,
                 remainingSeconds = totalSecs,
                 totalSeconds = totalSecs,
+                endTimeMillis = triggerAtMs,
                 currentSessionStartTimeMs = startTimeMs
             )
         }
 
-        startCountdownJob(totalSecs, totalSecs)
+        startCountdownTicker(triggerAtMs, totalSecs)
     }
 
-    private fun startCountdownJob(currentSecs: Long, totalSecs: Long) {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            var currentRemaining = currentSecs
-            while (currentRemaining > 0) {
-                delay(1000L)
-                currentRemaining--
-                _uiState.update { it.copy(remainingSeconds = currentRemaining) }
+    /**
+     * Live ticker continuously derived from the persisted endTimeMillis.
+     * Guarantees zero clock drift.
+     */
+    private fun startCountdownTicker(endTimeMillis: Long, totalSecs: Long) {
+        tickerJob?.cancel()
+        tickerJob = viewModelScope.launch {
+            while (true) {
+                val now = System.currentTimeMillis()
+                val remaining = ((endTimeMillis - now + 999L) / 1000L).coerceAtLeast(0L)
+                _uiState.update {
+                    it.copy(
+                        remainingSeconds = remaining,
+                        totalSeconds = totalSecs,
+                        isTimerRunning = (remaining > 0)
+                    )
+                }
+                if (remaining <= 0) {
+                    repository.setAwaitingEntry(true)
+                    break
+                }
+                delay(500L)
             }
-            // Timer expired
-            _uiState.update { it.copy(isTimerRunning = false, remainingSeconds = 0) }
-            repository.setAwaitingEntry(true)
         }
     }
 
@@ -146,8 +169,8 @@ class FocusLogViewModel(
      * Cancels the active timer, clears DataStore state, and unregisters the AlarmManager alarm.
      */
     fun cancelTimer() {
-        timerJob?.cancel()
-        timerJob = null
+        tickerJob?.cancel()
+        tickerJob = null
         cancelSystemAlarm()
 
         viewModelScope.launch {
@@ -158,7 +181,8 @@ class FocusLogViewModel(
             it.copy(
                 isTimerRunning = false,
                 remainingSeconds = 0L,
-                totalSeconds = 0L
+                totalSeconds = 0L,
+                endTimeMillis = 0L
             )
         }
     }
@@ -200,9 +224,6 @@ class FocusLogViewModel(
     }
 
     companion object {
-        private const val TAG = "FocusLogViewModel"
-        const val ALARM_REQUEST_CODE = 2001
-
         fun provideFactory(application: Application): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")

@@ -10,6 +10,7 @@ data class FocusLogUiState(
     val isTimerRunning: Boolean = false,
     val remainingSeconds: Long = 0L,
     val totalSeconds: Long = 0L,
+    val endTimeMillis: Long = 0L,
     val minutesInput: String = "25",
     val secondsInput: String = "0",
     val currentSessionStartTimeMs: Long = 0L

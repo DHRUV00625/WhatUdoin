@@ -27,6 +27,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import com.focuslog.app.util.TimeUtils
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -110,13 +112,18 @@ fun HomeScreen(
                 onMinutesChange = viewModel::onMinutesChange,
                 onSecondsChange = viewModel::onSecondsChange,
                 onStartTimer = viewModel::startTimer,
-                onCancelTimer = viewModel::cancelTimer
+                onCancelTimer = viewModel::cancelTimer,
+                onResetInputs = viewModel::resetInputs
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Visual Stack of Cards (renders empty placeholder when no entries exist)
-            CardStackView(entries = uiState.entries)
+            // Visual Stack of Cards for Today's Log Entries
+            val todaysEntries = remember(uiState.entries) {
+                val todayDate = TimeUtils.getCurrentDateIst()
+                uiState.entries.filter { TimeUtils.formatEpochToDateIst(it.completedAtMillis) == todayDate }
+            }
+            CardStackView(entries = todaysEntries)
 
             Spacer(modifier = Modifier.height(24.dp))
         }
