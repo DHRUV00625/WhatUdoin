@@ -8,8 +8,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.focuslog.app.data.export.MarkdownExporter
 import com.focuslog.app.data.local.FocusLogDatabase
-import com.focuslog.app.data.repository.FocusLogRepository
 import com.focuslog.app.util.TimeUtils
 import java.util.concurrent.TimeUnit
 
@@ -27,10 +27,16 @@ class DailyExportWorker(
         Log.d(TAG, "Starting 2:00 AM IST Daily Export Worker...")
         return try {
             val database = FocusLogDatabase.getDatabase(applicationContext)
-            val repository = FocusLogRepository(applicationContext, database.focusLogDao())
+            val dao = database.logEntryDao()
+            val entries = dao.getAll()
 
-            val exportedCount = repository.exportAndClearDailyEntries()
-            Log.d(TAG, "Daily reset completed: $exportedCount entries exported and purged.")
+            val exported = MarkdownExporter.exportEntriesToMarkdown(applicationContext, entries)
+            if (exported.isNotEmpty()) {
+                dao.deleteAll()
+                Log.d(TAG, "Daily reset completed: ${exported.size} entries exported and purged.")
+            } else {
+                Log.d(TAG, "No entries to export.")
+            }
 
             // Reschedule next run for the upcoming 2:00 AM IST
             scheduleDailyExport(applicationContext)
@@ -70,4 +76,3 @@ class DailyExportWorker(
         }
     }
 }
-

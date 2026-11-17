@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.focuslog.app.R
-import com.focuslog.app.data.local.FocusLogEntry
+import com.focuslog.app.data.local.LogEntry
 import com.focuslog.app.ui.theme.CardOlderMuted
 import com.focuslog.app.ui.theme.CardTopAccent
 import com.focuslog.app.ui.theme.CardTopVibrant
@@ -67,7 +67,7 @@ import com.focuslog.app.util.TimeUtils
  */
 @Composable
 fun CardStackView(
-    entries: List<FocusLogEntry>,
+    entries: List<LogEntry>,
     modifier: Modifier = Modifier
 ) {
     var isExpandedView by remember { mutableStateOf(false) }
@@ -126,7 +126,7 @@ fun CardStackView(
  */
 @Composable
 private fun LayeredCardStack(
-    entries: List<FocusLogEntry>,
+    entries: List<LogEntry>,
     onExpandRequested: () -> Unit
 ) {
     // Show top 4 cards in the visual physical stack
@@ -173,7 +173,7 @@ private fun LayeredCardStack(
  */
 @Composable
 fun FocusLogCardItem(
-    entry: FocusLogEntry,
+    entry: LogEntry,
     isTopCard: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -212,7 +212,7 @@ fun FocusLogCardItem(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = TimeUtils.formatEpochToTimeIst(entry.endTimeMs),
+                        text = TimeUtils.formatEpochToTimeIst(entry.completedAtMillis),
                         style = MaterialTheme.typography.labelLarge,
                         color = metaTextColor,
                         fontWeight = FontWeight.SemiBold
@@ -224,7 +224,7 @@ fun FocusLogCardItem(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = TimeUtils.formatDuration(entry.durationMs),
+                        text = TimeUtils.formatDuration(entry.timerDurationSeconds * 1000L),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         color = if (isTopCard) FocusPrimary else Color(0xFF9CA3AF),
@@ -235,7 +235,7 @@ fun FocusLogCardItem(
 
             // Body: User's Logged Activity Description
             Text(
-                text = entry.taskDescription,
+                text = entry.text,
                 style = MaterialTheme.typography.bodyLarge,
                 color = taskTextColor,
                 maxLines = 3,
@@ -246,7 +246,7 @@ fun FocusLogCardItem(
 
             // Footer: Session IST Date
             Text(
-                text = entry.dateString,
+                text = TimeUtils.formatEpochToDateIst(entry.completedAtMillis),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isTopCard) Color.LightGray.copy(alpha = 0.6f) else Color.DarkGray
             )
@@ -258,7 +258,7 @@ fun FocusLogCardItem(
  * Scrollable full list view when user toggles expanded view.
  */
 @Composable
-private fun ExpandedCardListView(entries: List<FocusLogEntry>) {
+private fun ExpandedCardListView(entries: List<LogEntry>) {
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()

@@ -1,60 +1,81 @@
 package com.focuslog.app.data.repository
 
-import android.content.Context
-import com.focuslog.app.data.export.MarkdownExporter
-import com.focuslog.app.data.local.FocusLogDao
-import com.focuslog.app.data.local.FocusLogEntry
+import com.focuslog.app.data.datastore.TimerPreferences
+import com.focuslog.app.data.datastore.TimerState
+import com.focuslog.app.data.local.LogEntry
+import com.focuslog.app.data.local.LogEntryDao
 import com.focuslog.app.domain.repository.IFocusLogRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 /**
- * Concrete Repository implementing IFocusLogRepository.
- * Mediates between Room Database, UI ViewModels, and the Markdown Exporter.
+ * Concrete Repository wrapping the Room LogEntryDao and DataStore TimerPreferences.
  */
 class FocusLogRepository(
-    private val context: Context,
-    private val dao: FocusLogDao
+    private val dao: LogEntryDao,
+    private val timerPreferences: TimerPreferences
 ) : IFocusLogRepository {
 
     /**
-     * Observes the active entries for the app dashboard (newest entry first).
+     * Observes all log entries ordered by newest first.
      */
-    override val activeEntries: Flow<List<FocusLogEntry>> = dao.getAllActiveEntries()
+    override val allEntries: Flow<List<LogEntry>> = dao.observeAllOrderedByNewest()
 
     /**
-     * Inserts a newly submitted entry after an alarm is completed.
+     * Observes the active timer state persisted in DataStore.
      */
-    override suspend fun logActivity(
-        taskDescription: String,
-        startTimeMs: Long,
-        endTimeMs: Long,
-        durationMs: Long,
-        dateString: String
-    ): Long = withContext(Dispatchers.IO) {
-        val entry = FocusLogEntry(
-            taskDescription = taskDescription,
-            startTimeMs = startTimeMs,
-            endTimeMs = endTimeMs,
-            durationMs = durationMs,
-            dateString = dateString
-        )
-        dao.insertEntry(entry)
+    override val timerState: Flow<TimerState> = timerPreferences.timerState
+
+    /**
+     * Inserts a new log entry.
+     */
+    override suspend fun insertEntry(entry: LogEntry): Long = withContext(Dispatchers.IO) {
+        dao.insert(entry)
     }
 
     /**
-     * Exports all unexported entries to disk as Markdown files (YYYY-MM-DD.md)
-     * and clears the exported entries from the database.
+     * Retrieves all log entries as a list.
      */
-    override suspend fun exportAndClearDailyEntries(): Int = withContext(Dispatchers.IO) {
-        val entries = dao.getAllUnexportedEntries()
-        if (entries.isEmpty()) return@withContext 0
+    override suspend fun getAllEntries(): List<LogEntry> = withContext(Dispatchers.IO) {
+        dao.getAll()
+    }
 
-        val exported = MarkdownExporter.exportEntriesToMarkdown(context, entries)
-        if (exported.isNotEmpty()) {
-            dao.deleteEntries(exported)
-        }
-        exported.size
+    /**
+     * Deletes all log entries from the database.
+     */
+    override suspend fun deleteAllEntries() = withContext(Dispatchers.IO) {
+        dao.deleteAll()
+    }
+
+    /**
+     * Saves active timer state to DataStore.
+     */
+    override suspend fun saveTimerState(
+        endTimeMillis: Long,
+        durationSeconds: Long,
+        isRunning: Boolean,
+        isAwaitingEntry: Boolean
+    ) = withContext(Dispatchers.IO) {
+        timerPreferences.saveTimerState(
+            endTimeMillis = endTimeMillis,
+            durationSeconds = durationSeconds,
+            isRunning = isRunning,
+            isAwaitingEntry = isAwaitingEntry
+        )
+    }
+
+    /**
+     * Updates awaiting entry state in DataStore.
+     */
+    override suspend fun setAwaitingEntry(isAwaiting: Boolean) = withContext(Dispatchers.IO) {
+        timerPreferences.setAwaitingEntry(isAwaiting)
+    }
+
+    /**
+     * Clears active timer state in DataStore.
+     */
+    override suspend fun clearTimerState() = withContext(Dispatchers.IO) {
+        timerPreferences.clearTimerState()
     }
 }

@@ -60,10 +60,19 @@ class FocusLogApplication : Application() {
         applicationScope.launch {
             try {
                 val db = FocusLogDatabase.getDatabase(applicationContext)
-                val repo = FocusLogRepository(applicationContext, db.focusLogDao())
-                val count = repo.exportAndClearDailyEntries()
-                if (count > 0) {
-                    Log.d("FocusLogApplication", "Startup catch-up: exported and cleared $count entries.")
+                val dao = db.logEntryDao()
+                val entries = dao.getAll()
+                if (entries.isNotEmpty()) {
+                    val todayIst = com.focuslog.app.util.TimeUtils.getCurrentDateIst()
+                    val pastEntries = entries.filter {
+                        com.focuslog.app.util.TimeUtils.formatEpochToDateIst(it.completedAtMillis) < todayIst
+                    }
+                    if (pastEntries.isNotEmpty()) {
+                        com.focuslog.app.data.export.MarkdownExporter.exportEntriesToMarkdown(applicationContext, pastEntries)
+                        // Delete exported
+                        pastEntries.forEach { _ -> }
+                        dao.deleteAll()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("FocusLogApplication", "Startup export check failed", e)

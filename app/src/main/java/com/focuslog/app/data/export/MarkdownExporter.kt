@@ -3,13 +3,13 @@ package com.focuslog.app.data.export
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import com.focuslog.app.data.local.FocusLogEntry
+import com.focuslog.app.data.local.LogEntry
 import com.focuslog.app.util.TimeUtils
 import java.io.File
 import java.io.FileWriter
 
 /**
- * Handles exporting FocusLog entries to daily Markdown files (YYYY-MM-DD.md).
+ * Handles exporting LogEntry records to daily Markdown files (YYYY-MM-DD.md).
  */
 object MarkdownExporter {
 
@@ -22,7 +22,7 @@ object MarkdownExporter {
      *
      * @return List of entries that were successfully exported to disk.
      */
-    fun exportEntriesToMarkdown(context: Context, entries: List<FocusLogEntry>): List<FocusLogEntry> {
+    fun exportEntriesToMarkdown(context: Context, entries: List<LogEntry>): List<LogEntry> {
         if (entries.isEmpty()) {
             Log.d(TAG, "No entries available to export.")
             return emptyList()
@@ -35,8 +35,8 @@ object MarkdownExporter {
             return emptyList()
         }
 
-        val exportedEntries = mutableListOf<FocusLogEntry>()
-        val groupedByDate = entries.groupBy { it.dateString }
+        val exportedEntries = mutableListOf<LogEntry>()
+        val groupedByDate = entries.groupBy { TimeUtils.formatEpochToDateIst(it.completedAtMillis) }
 
         for ((dateString, dateEntries) in groupedByDate) {
             val file = File(exportDir, "$dateString.md")
@@ -59,9 +59,9 @@ object MarkdownExporter {
     /**
      * Builds the formatted markdown document for a given day.
      */
-    private fun buildMarkdownContent(dateString: String, entries: List<FocusLogEntry>): String {
+    private fun buildMarkdownContent(dateString: String, entries: List<LogEntry>): String {
         val totalSessions = entries.size
-        val totalDurationMs = entries.sumOf { it.durationMs }
+        val totalDurationMs = entries.sumOf { it.timerDurationSeconds * 1000L }
         val formattedTotalDuration = TimeUtils.formatDuration(totalDurationMs)
 
         return buildString {
@@ -77,16 +77,15 @@ object MarkdownExporter {
             appendLine("## Session Entries")
             appendLine()
 
-            entries.sortedBy { it.startTimeMs }.forEachIndexed { index, entry ->
-                val startTimeStr = TimeUtils.formatEpochToTimeIst(entry.startTimeMs)
-                val endTimeStr = TimeUtils.formatEpochToTimeIst(entry.endTimeMs)
-                val durationStr = TimeUtils.formatDuration(entry.durationMs)
+            entries.sortedBy { it.startedAtMillis }.forEachIndexed { index, entry ->
+                val startTimeStr = TimeUtils.formatEpochToTimeIst(entry.startedAtMillis)
+                val endTimeStr = TimeUtils.formatEpochToTimeIst(entry.completedAtMillis)
+                val durationStr = TimeUtils.formatDuration(entry.timerDurationSeconds * 1000L)
 
                 appendLine("### ${index + 1}. $startTimeStr – $endTimeStr ($durationStr)")
-                appendLine(entry.taskDescription.trim())
+                appendLine(entry.text.trim())
                 appendLine()
             }
         }
     }
 }
-

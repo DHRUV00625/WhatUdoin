@@ -7,16 +7,16 @@ import androidx.room.RoomDatabase
 
 /**
  * Main Room database instance for FocusLog.
- * Operates purely locally with no network synchronization.
+ * Operates purely locally with zero network synchronization.
  */
 @Database(
-    entities = [FocusLogEntry::class],
-    version = 1,
+    entities = [LogEntry::class],
+    version = 2,
     exportSchema = false
 )
 abstract class FocusLogDatabase : RoomDatabase() {
 
-    abstract fun focusLogDao(): FocusLogDao
+    abstract fun logEntryDao(): LogEntryDao
 
     companion object {
         @Volatile
@@ -37,4 +37,3 @@ abstract class FocusLogDatabase : RoomDatabase() {
         }
     }
 }
-

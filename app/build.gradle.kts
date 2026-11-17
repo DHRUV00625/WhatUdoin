@@ -64,7 +64,18 @@ dependencies {
     // WorkManager (for scheduled 2:00 AM IST daily exports)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // DataStore Preferences (for active timer persistence)
+    implementation(libs.androidx.datastore.preferences)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Unit Testing
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.robolectric)
 }
 

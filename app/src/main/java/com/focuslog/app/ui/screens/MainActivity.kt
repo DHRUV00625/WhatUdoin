@@ -152,20 +152,14 @@ class MainActivity : ComponentActivity() {
         durationMs: Long
     ) {
         val now = System.currentTimeMillis()
-        val dateString = TimeUtils.getCurrentDateIst()
+        val durationSeconds = durationMs / 1000L
 
-        val db = FocusLogDatabase.getDatabase(applicationContext)
-        val repo = FocusLogRepository(applicationContext, db.focusLogDao())
-
-        CoroutineScope(Dispatchers.IO).launch {
-            repo.logActivity(
-                taskDescription = description.trim(),
-                startTimeMs = startTimeMs,
-                endTimeMs = now,
-                durationMs = durationMs,
-                dateString = dateString
-            )
-        }
+        viewModel.insertLogEntry(
+            text = description.trim(),
+            startedAtMillis = startTimeMs,
+            completedAtMillis = now,
+            durationSeconds = durationSeconds
+        )
 
         // Stop the alarm audio and release wake lock
         AlarmService.stop(this)
