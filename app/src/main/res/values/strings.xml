@@ -5,12 +5,11 @@
     <string name="cancel_timer">Cancel</string>
     <string name="minutes_label">Minutes</string>
     <string name="seconds_label">Seconds</string>
-    <string name="alarm_ringing">Time is up!</string>
-    <string name="alarm_prompt">What did you accomplish during this session?</string>
-    <string name="activity_input_hint">Type what you worked on...</string>
-    <string name="submit_and_dismiss">Submit &amp; Stop Alarm</string>
+    <string name="alarm_ringing">Time\'s up! What did you do?</string>
+    <string name="alarm_prompt">Time\'s up! What did you do?</string>
+    <string name="activity_input_hint">What did you work on? (required)</string>
+    <string name="submit_and_dismiss">Submit</string>
     <string name="empty_stack_message">No sessions logged today yet.\nStart a timer to begin!</string>
-    <string name="alarm_notification_title">FocusLog - Session Finished</string>
-    <string name="alarm_notification_desc">Tap to log your task and stop the alarm.</string>
+    <string name="alarm_notification_title">FocusLog - Time\'s Up!</string>
+    <string name="alarm_notification_desc">What did you do? Submit entry to stop alarm.</string>
 </resources>
-

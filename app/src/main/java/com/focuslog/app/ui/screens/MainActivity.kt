@@ -16,7 +16,11 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,6 +34,11 @@ import com.focuslog.app.ui.viewmodel.FocusLogViewModel
  * Single Activity hosting the Jetpack Compose NavHost with two destinations:
  * 1. HomeScreen (start destination)
  * 2. AlarmEntryScreen (cannot be dismissed by back press or swipe until log submitted)
+ *
+ * Configured with lockscreen display flags:
+ * - setShowWhenLocked(true)
+ * - setTurnScreenOn(true)
+ * - FLAG_KEEP_SCREEN_ON
  */
 class MainActivity : ComponentActivity() {
 
@@ -38,6 +47,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private var currentDestination: String = "home"
+    private var navController: NavHostController? = null
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -62,10 +72,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FocusLogTheme(darkTheme = true) {
-                val navController = rememberNavController()
+                val controller = rememberNavController()
+                navController = controller
+
+                val uiState by viewModel.uiState.collectAsState()
+
+                // If timer expired or awaiting entry state is active, navigate to AlarmEntryScreen
+                LaunchedEffect(uiState.isAwaitingEntry) {
+                    if (uiState.isAwaitingEntry && !currentDestination.startsWith("alarm_entry")) {
+                        currentDestination = "alarm_entry"
+                        val startMs = if (uiState.currentSessionStartTimeMs > 0) {
+                            uiState.currentSessionStartTimeMs
+                        } else {
+                            System.currentTimeMillis() - (uiState.totalSeconds * 1000L)
+                        }
+                        val durationMs = uiState.totalSeconds * 1000L
+                        controller.navigate("alarm_entry/$startMs/$durationMs") {
+                            popUpTo("home") { inclusive = false }
+                        }
+                    }
+                }
 
                 NavHost(
-                    navController = navController,
+                    navController = controller,
                     startDestination = startDestination
                 ) {
                     composable("home") {
@@ -74,7 +103,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = viewModel,
                             onNavigateToAlarmEntry = { startTime, duration ->
                                 currentDestination = "alarm_entry"
-                                navController.navigate("alarm_entry/$startTime/$duration")
+                                controller.navigate("alarm_entry/$startTime/$duration")
                             }
                         )
                     }
@@ -101,8 +130,8 @@ class MainActivity : ComponentActivity() {
                                     durationMs = durationMs
                                 )
                                 currentDestination = "home"
-                                navController.navigate("home") {
-                                    popUpTo("home") { inclusive = true }
+                                controller.navigate("home") {
+                                    popUpTo(0) { inclusive = true }
                                 }
                             }
                         )
@@ -118,8 +147,10 @@ class MainActivity : ComponentActivity() {
         val incomingStartTime = intent.getLongExtra(AlarmService.EXTRA_START_TIME, -1L)
         val incomingDuration = intent.getLongExtra(AlarmService.EXTRA_DURATION_MS, -1L)
         if (incomingStartTime > 0 && incomingDuration > 0) {
-            // Re-deliver intent to bring AlarmEntryScreen into focus
-            recreate()
+            currentDestination = "alarm_entry"
+            navController?.navigate("alarm_entry/$incomingStartTime/$incomingDuration") {
+                popUpTo("home") { inclusive = false }
+            }
         }
     }
 
@@ -194,7 +225,7 @@ class MainActivity : ComponentActivity() {
             durationSeconds = durationSeconds
         )
 
-        // Stop the alarm audio and release wake lock
+        // Stop the alarm audio, vibration, and release wake lock
         AlarmService.stop(this)
     }
 }

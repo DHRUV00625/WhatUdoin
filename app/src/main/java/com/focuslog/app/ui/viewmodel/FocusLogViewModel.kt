@@ -60,19 +60,44 @@ class FocusLogViewModel(
                                 remainingSeconds = remainingSecs,
                                 totalSeconds = savedState.durationSeconds,
                                 endTimeMillis = savedState.endTimeMillis,
-                                currentSessionStartTimeMs = savedState.endTimeMillis - (savedState.durationSeconds * 1000L)
+                                currentSessionStartTimeMs = savedState.endTimeMillis - (savedState.durationSeconds * 1000L),
+                                isAwaitingEntry = false
                             )
                         }
                         startCountdownTicker(savedState.endTimeMillis, savedState.durationSeconds)
                     } else {
                         // Timer completed while app was backgrounded/closed
                         _uiState.update {
-                            it.copy(isTimerRunning = false, remainingSeconds = 0, endTimeMillis = 0)
+                            it.copy(
+                                isTimerRunning = false,
+                                remainingSeconds = 0,
+                                endTimeMillis = 0,
+                                isAwaitingEntry = true,
+                                totalSeconds = savedState.durationSeconds,
+                                currentSessionStartTimeMs = savedState.endTimeMillis - (savedState.durationSeconds * 1000L)
+                            )
                         }
                     }
+                } else if (savedState.isAwaitingEntry) {
+                    _uiState.update {
+                        it.copy(
+                            isTimerRunning = false,
+                            remainingSeconds = 0,
+                            endTimeMillis = 0,
+                            isAwaitingEntry = true,
+                            totalSeconds = savedState.durationSeconds,
+                            currentSessionStartTimeMs = savedState.endTimeMillis - (savedState.durationSeconds * 1000L)
+                        )
+                    }
+                    tickerJob?.cancel()
                 } else {
                     _uiState.update {
-                        it.copy(isTimerRunning = false, remainingSeconds = 0, endTimeMillis = 0)
+                        it.copy(
+                            isTimerRunning = false,
+                            remainingSeconds = 0,
+                            endTimeMillis = 0,
+                            isAwaitingEntry = false
+                        )
                     }
                     tickerJob?.cancel()
                 }
@@ -158,6 +183,13 @@ class FocusLogViewModel(
                 }
                 if (remaining <= 0) {
                     repository.setAwaitingEntry(true)
+                    _uiState.update {
+                        it.copy(
+                            isTimerRunning = false,
+                            remainingSeconds = 0,
+                            isAwaitingEntry = true
+                        )
+                    }
                     break
                 }
                 delay(500L)
